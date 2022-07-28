@@ -1,11 +1,11 @@
 import pickle
 from time import time
 import numpy as np
-from tnw_cate_model import *
 from treatment_frameworks import *
 from utility import *
 from other_models import *
 from funcs import get_log_setup, get_pow_setup, get_spiral_setup, get_indic_setup
+import tensorflow as tf
 
 if __name__ == '__main__':
 

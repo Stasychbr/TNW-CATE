@@ -1,7 +1,7 @@
 import pickle
 from time import time
 import numpy as np
-from tnw_cate_model import *
+import tensorflow as tf
 from treatment_frameworks import *
 from utility import *
 from other_models import *

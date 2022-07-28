@@ -1,6 +1,6 @@
 # TNW-CATE method
 
-This repository contains the code base for "Heterogeneous Treatment Effect with Trained Kernels of the Nadaraya-Watson regression" article. The program is written in python 3 using the Tensorflow framework.
+This repository contains the code base for "[Heterogeneous Treatment Effect with Trained Kernels of the Nadaraya-Watson regression](https://arxiv.org/abs/2207.09139)" article. The program is written in python 3 using the Tensorflow framework.
 
 To satisfy the dependencies use pip and requirements.txt:
 

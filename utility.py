@@ -1,6 +1,6 @@
 import numba
 import numpy as np
-from tnw_cate_model import train_kernel, train_alpha, DynamicModel
+import tnw_cate as tc
 
 def calc_mse(y1, y2):
     return np.mean((np.ravel(y1) - np.ravel(y2)) ** 2)
@@ -120,9 +120,6 @@ class dataset_param_getter(dataset_getter):
 
         self.val_size_c = val_size_c
 
-    
-
-
 class dataset_sa_func_getter(dataset_getter):
     def __init__(self, func, x_bounds):
         self.func = func
@@ -165,15 +162,15 @@ class dataset_sa_func_getter(dataset_getter):
 
         self.val_size_c = val_size_c
 
-def get_basic_dynamic_model(data_getter, m, n, epochs_num, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience):
+def get_basic_dynamic_model(data_getter, m, n, epochs_num, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience, verbose=2):
     *val_set_kernel_0, val_labels_kernel_0 = make_spec_set(data_getter.control_x, data_getter.val_set_c, data_getter.control_y, data_getter.val_labels_c, n, m, mlp_coef_val)
-    model_static, _ = train_kernel(data_getter.control_x, data_getter.control_y, n, m, mlp_coef, epochs_num, (val_set_kernel_0, val_labels_kernel_0), seed, batch_size, patience, learning_rate)
-    return DynamicModel(model_static, False)
+    model_static, _ = tc.train_kernel(data_getter.control_x, data_getter.control_y, n, m, mlp_coef, epochs_num, (val_set_kernel_0, val_labels_kernel_0), seed, batch_size, patience, learning_rate, verbose=verbose)
+    return tc.DynamicModel(model_static, False)
 
-def get_alpha_dynamic_model(data_getter, m, n_c, n_t, epochs_num, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience):
+def get_alpha_dynamic_model(data_getter, m, n_c, n_t, epochs_num, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience, verbose=2):
     *val_set_alpha_t, val_labels_alpha_t = make_part_set(data_getter.treat_x, data_getter.treat_y, data_getter.val_set_t, data_getter.val_labels_t, n_t, m, mlp_coef_val * data_getter.val_size_c) 
     *val_set_alpha_c, val_labels_alpha_c = make_part_set(data_getter.control_x, data_getter.control_y,  data_getter.val_set_c, data_getter.val_labels_c, n_c, m, mlp_coef_val * data_getter.val_size_c)
     val_set_alpha = list(val_set_alpha_c) + list(val_set_alpha_t)
     val_labels_alpha = [val_labels_alpha_c, val_labels_alpha_t]
-    alpha_model_static, _ = train_alpha(data_getter.control_x, data_getter.control_y, data_getter.treat_x, data_getter.treat_y, n_c, n_t, m, epochs_num, tasks, (val_set_alpha, val_labels_alpha), seed, alpha, batch_size, patience, learning_rate)
-    return DynamicModel(alpha_model_static, False)
+    alpha_model_static, _ = tc.train_alpha(data_getter.control_x, data_getter.control_y, data_getter.treat_x, data_getter.treat_y, n_c, n_t, m, epochs_num, tasks, (val_set_alpha, val_labels_alpha), seed, alpha, batch_size, patience, learning_rate, verbose=verbose)
+    return tc.DynamicModel(alpha_model_static, False)
