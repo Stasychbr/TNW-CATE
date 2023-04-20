@@ -6,7 +6,7 @@ from keras import layers
 
 
 class DynamicModel():
-    def __init__(self, static_model, f_gpu=True, f_w_feat=False, f_normalize=False) -> None:
+    def __init__(self, static_model, f_gpu=True, f_w_feat=False, f_normalize=True) -> None:
         self.kernel = static_model.get_layer('kernel')
         self.w_feat = f_w_feat
         self.f_norm = f_normalize
@@ -89,7 +89,7 @@ def get_d_model(m, topology=None, seed=None):  # dimension of 1 point
     return Model([x_i, x_p], layer, name='kernel')
 
 
-def get_full_model(n, m, topology=None, seed=None, f_normalize=False):
+def get_full_model(n, m, topology=None, seed=None, f_normalize=True):
     x_input = Input(shape=(n, m), name='x_i')
     y_input = Input(shape=(n), name='y_i')
     x_p_input = Input(shape=(m), name='x_predict')
@@ -108,7 +108,7 @@ def get_full_model(n, m, topology=None, seed=None, f_normalize=False):
     return Model([x_input, y_input, x_p_input], dot / sum)
 
 
-def get_alpha_model(n_c, n_t, m, topology=None, seed=None, f_normalize=False):
+def get_alpha_model(n_c, n_t, m, topology=None, seed=None, f_normalize=True):
     x_i_c = Input(shape=(n_c, m), name='x_i_c')
     y_i_c = Input(shape=(n_c), name='y_i_c')
     x_p_c = Input(shape=(m), name='x_predict_c')

@@ -216,15 +216,16 @@ class dataset_sa_func_getter(dataset_getter):
         self.val_size_c = val_size_c
 
 
-def get_basic_dynamic_model(data_getter, m, n, epochs_num, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience, verbose=2):
+def get_basic_dynamic_model(data_getter, m, n, epochs_num, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience, verbose=2, f_normalize=True):
     *val_set_kernel_0, val_labels_kernel_0 = make_spec_set(
         data_getter.control_x, data_getter.val_set_c, data_getter.control_y, data_getter.val_labels_c, n, m, mlp_coef_val)
-    model_static, _ = tc.train_kernel(data_getter.control_x, data_getter.control_y, n, m, mlp_coef, epochs_num, (
-        val_set_kernel_0, val_labels_kernel_0), seed, batch_size, patience, learning_rate, verbose=verbose)
-    return tc.DynamicModel(model_static, False)
+    model_static, _ = tc.train_kernel(data_getter.control_x, data_getter.control_y, n, m, mlp_coef,
+                                      epochs_num, (val_set_kernel_0, val_labels_kernel_0), seed, batch_size,
+                                      patience, learning_rate, verbose=verbose, f_normalize=f_normalize)
+    return tc.DynamicModel(model_static, False, f_normalize=f_normalize)
 
 
-def get_alpha_dynamic_model(data_getter, m, n_c, n_t, epochs_num, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience, verbose=2):
+def get_alpha_dynamic_model(data_getter, m, n_c, n_t, epochs_num, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience, verbose=2, f_normalize=True):
     treat_set = data_getter.val_set_t
     treat_labels = data_getter.val_labels_t
     if len(data_getter.val_set_t) == 0:
@@ -237,5 +238,6 @@ def get_alpha_dynamic_model(data_getter, m, n_c, n_t, epochs_num, mlp_coef_val, 
     val_set_alpha = list(val_set_alpha_c) + list(val_set_alpha_t)
     val_labels_alpha = [val_labels_alpha_c, val_labels_alpha_t]
     alpha_model_static, _ = tc.train_alpha(data_getter.control_x, data_getter.control_y, data_getter.treat_x, data_getter.treat_y, n_c,
-                                           n_t, m, epochs_num, tasks, (val_set_alpha, val_labels_alpha), seed, alpha, batch_size, patience, learning_rate, verbose=verbose)
-    return tc.DynamicModel(alpha_model_static, False)
+                                           n_t, m, epochs_num, tasks, (val_set_alpha, val_labels_alpha), seed, alpha,
+                                           batch_size, patience, learning_rate, verbose=verbose, f_normalize=f_normalize)
+    return tc.DynamicModel(alpha_model_static, False, f_normalize=f_normalize)

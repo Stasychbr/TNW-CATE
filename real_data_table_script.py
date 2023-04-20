@@ -83,8 +83,8 @@ if __name__ == '__main__':
             control_size = np.count_nonzero(train_w == 0)
             treat_size = np.count_nonzero(train_w == 1)
             mlp_coef = tasks_num // control_size
-            model = get_basic_dynamic_model(
-                setup, m, n, epochs_num_ordinary, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience)
+            model = get_basic_dynamic_model(setup, m, n, epochs_num_ordinary, mlp_coef, 
+                                            mlp_coef_val, learning_rate, seed, batch_size, patience, f_normalize=False)
 
             *test_data_control, cnt_label = make_spec_set(control_x,
                                                           test_x, control_y, test_control, control_size, m, 1)
@@ -94,7 +94,8 @@ if __name__ == '__main__':
             results['Kernel control'].append(calc_mse(cnt_pred, cnt_label))
             n_t = treat_size // 2
             n_c = n_t
-            alpha_model = get_alpha_dynamic_model(setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val, learning_rate, seed, batch_size, tasks_alpha, alpha, patience)
+            alpha_model = get_alpha_dynamic_model(setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val,
+                                                  learning_rate, seed, batch_size, tasks_alpha, alpha, patience, f_normalize=False)
             trt_pred_a = alpha_model.predict(test_data_treat)
             trt_pred_a = model.predict(test_data_treat)
             results['Kernel treat'].append(calc_mse(trt_pred_a, trt_label))
