@@ -2,36 +2,36 @@ import pickle
 from time import time
 import numpy as np
 import tensorflow as tf
+from sklearn.ensemble import RandomForestRegressor
 from treatment_frameworks import *
 from utility import *
 from other_models import *
-from funcs import get_log_setup, get_pow_setup, get_spiral_setup, get_indic_setup
+from funcs import get_ihdp_setup
+
 
 if __name__ == '__main__':
 
-    cur_setup = get_spiral_setup
+    cur_setup = get_ihdp_setup
+    train_parts = [0.2, 0.26, 0.32, 0.38, 0.44]
+    n_splits = 3
 
     alpha = 0.1
     batch_size = 256
-    learning_rate_a = 0.002
+    learning_rate_a = 0.005
     learning_rate = 0.01
-    epochs_num_alpha = 70
-    epochs_num_ordinary = 30
+    epochs_num_alpha = 50
+    epochs_num_ordinary = 50
     patience = 5
-    m = 10
-    tasks = 200000
+    tasks_alpha = 100000
     iters = 1
-    n_splits = 3
 
-    control_sizes = [100, 250, 500, 750, 1000]
-    treat_part = 0.1
-    test_size = 1000
-
-    mlp_coef_val = 500
+    tasks_num = 100000
+    n = 100
+    mlp_coef_val = 200
 
     seed = int(time()) % 2048
 
-    ser_name = f'size experiment.pk'
+    ser_name = 'ihdp experiment'
 
     nw_cv_grid = {
         'gamma': [10 ** i for i in range(-8, 11)] + [0.5, 5, 50, 100, 200, 500, 700],
@@ -43,23 +43,23 @@ if __name__ == '__main__':
     }
 
     results = {
-        'T-NW control mse': [[] for _ in range(len(control_sizes))],
-        'T-NW treat mse': [[] for _ in range(len(control_sizes))],
-        'T-NW CATE mse': [[] for _ in range(len(control_sizes))],
-        'S-NW control mse': [[] for _ in range(len(control_sizes))],
-        'S-NW treat mse': [[] for _ in range(len(control_sizes))],
-        'S-NW CATE mse': [[] for _ in range(len(control_sizes))],
-        'X-NW CATE mse': [[] for _ in range(len(control_sizes))],
-        'T-Learner control mse': [[] for _ in range(len(control_sizes))],
-        'T-Learner treat mse': [[] for _ in range(len(control_sizes))],
-        'T-Learner CATE mse': [[] for _ in range(len(control_sizes))],
-        'S-Learner control mse': [[] for _ in range(len(control_sizes))],
-        'S-Learner treat mse': [[] for _ in range(len(control_sizes))],
-        'S-Learner CATE mse': [[] for _ in range(len(control_sizes))],
-        'X-Learner CATE mse': [[] for _ in range(len(control_sizes))],
-        'Kernel control': [[] for _ in range(len(control_sizes))],
-        'Kernel treat': [[] for _ in range(len(control_sizes))],
-        'Kernel CATE': [[] for _ in range(len(control_sizes))],
+        'T-NW control mse': [[] for _ in range(len(train_parts))],
+        'T-NW treat mse': [[] for _ in range(len(train_parts))],
+        'T-NW CATE mse': [[] for _ in range(len(train_parts))],
+        'S-NW control mse': [[] for _ in range(len(train_parts))],
+        'S-NW treat mse': [[] for _ in range(len(train_parts))],
+        'S-NW CATE mse': [[] for _ in range(len(train_parts))],
+        'X-NW CATE mse': [[] for _ in range(len(train_parts))],
+        'T-Learner control mse': [[] for _ in range(len(train_parts))],
+        'T-Learner treat mse': [[] for _ in range(len(train_parts))],
+        'T-Learner CATE mse': [[] for _ in range(len(train_parts))],
+        'S-Learner control mse': [[] for _ in range(len(train_parts))],
+        'S-Learner treat mse': [[] for _ in range(len(train_parts))],
+        'S-Learner CATE mse': [[] for _ in range(len(train_parts))],
+        'X-Learner CATE mse': [[] for _ in range(len(train_parts))],
+        'Kernel control': [[] for _ in range(len(train_parts))],
+        'Kernel treat': [[] for _ in range(len(train_parts))],
+        'Kernel CATE': [[] for _ in range(len(train_parts))],
         'time': [],
     }
 
@@ -69,23 +69,22 @@ if __name__ == '__main__':
 
     try:
         for i in range(iters):
-            setup = cur_setup(m)
-            for j, control_size in enumerate(control_sizes):
-                seed = np.random.randint(0, 2048)
-                print('size = ', control_size)
-                n = 100 if control_size > 100 else 80
-                treat_size = int(treat_part * control_size)
-                setup.make_set(control_size, treat_part, test_size)
-                mlp_coef = 200000 // control_size
-                n_t = treat_size // 2
-                n_c = n_t
+            seed = np.random.randint(0, 2048)
+            for j, train_part in enumerate(train_parts):
                 start_time = time()
-
+                setup = cur_setup(seed)
+                val_part = train_part / (n_splits - 1)
+                test_part = 1 - train_part - val_part
+                setup.make_set(val_part, test_part)
                 train_x, train_y, train_w = setup.get_train_set()
                 control_x, control_y, treat_x, treat_y = setup.get_cotrol_treat_sets()
                 test_x, test_control, test_treat,  test_cate = setup.get_test_set()
                 val_set_c, val_labels_c, val_set_t, val_labels_t = setup.get_val_set()
 
+                m = train_x.shape[1]
+                control_size = np.count_nonzero(train_w == 0)
+                treat_size = np.count_nonzero(train_w == 1)
+                mlp_coef = tasks_num // control_size
                 model = get_basic_dynamic_model(
                     setup, m, n, epochs_num_ordinary, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience)
 
@@ -94,9 +93,10 @@ if __name__ == '__main__':
                 *test_data_treat, trt_label = make_spec_set(treat_x, test_x, treat_y, test_treat, treat_size, m, 1)
                 cnt_pred = model.predict(test_data_control)
                 results['Kernel control'][j].append(calc_mse(cnt_pred, cnt_label))
-
+                n_t = treat_size // 2
+                n_c = n_t
                 alpha_model = get_alpha_dynamic_model(
-                    setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience)
+                    setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val, learning_rate, seed, batch_size, tasks_alpha, alpha, patience)
                 trt_pred_a = alpha_model.predict(test_data_treat)
                 results['Kernel treat'][j].append(calc_mse(trt_pred_a, trt_label))
                 results['Kernel CATE'][j].append(
@@ -134,10 +134,15 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(e)
-        pass
+    # except Exception as e:
+    #     print(e)
+    #     pass
     print('time elapsed: ', round(np.sum(results['time']), 0), ' s.')
+
+    print('result:')
+    for key, val in results.items():
+        if key != 'time':
+            print(key, ': ', round(np.mean(val), 6))
 
     params = {
         'batch_size': batch_size,
@@ -146,16 +151,16 @@ if __name__ == '__main__':
         'mlp_coef': mlp_coef,
         'patience': patience,
         'm': m,
-        'n': [80, 100],
-        'n_c_p': 0.5,
-        'n_t_p': 0.5,
+        'n': n,
+        'n_c': n_c,
+        'n_t': n_t,
         'alpha': alpha,
-        'tasks': tasks,
+        'tasks': tasks_alpha,
         'iters': iters,
-        'control_sizes': control_sizes,
-        'treat_part': treat_part,
+        'control_size': control_size,
         'treat_size': treat_size,
-        'test_size': test_size,
+        'test_size': test_x.shape[0],
+        'train_parts': train_parts,
         'seed': seed,
         'learning_rate': learning_rate,
         'val_part_c': 0.2,
@@ -164,5 +169,5 @@ if __name__ == '__main__':
     }
 
     results['params'] = params
-    with open(f'res_dicts/{ser_name}', 'wb') as file:
+    with open(f'res_dicts/{ser_name}.pk', 'wb') as file:
         pickle.dump(results, file)

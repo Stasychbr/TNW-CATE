@@ -5,19 +5,23 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from itertools import product
 from utility import calc_mse
+from typing import Iterable
+import warnings
 
 class KernelRegression(BaseEstimator, RegressorMixin):
 
-    def __init__(self, kernel="rbf", gamma=None):
+    def __init__(self, kernel="rbf", gamma=None, random_state=None):
         self.kernel = kernel
         self.gamma = gamma
         self.val_set = None
 
-    def get_params(self):
-        return {'gamma': self.gamma}
+    def get_params(self, deep=False):
+        return {'gamma': self.gamma, 'kernel': self.kernel}
 
-    def set_params(self, params):
-        self.gamma = params['gamma']
+    def set_params(self, gamma, kernel='rbf'):
+        self.gamma = gamma
+        self.kernel = kernel
+        return self
         
 
     def set_val(self, val_set, val_labels):
@@ -36,7 +40,9 @@ class KernelRegression(BaseEstimator, RegressorMixin):
 
     def predict(self, X):
         K = pairwise_kernels(self.X, self.scaler.transform(X), metric=self.kernel, gamma=self.gamma)
-        return np.nan_to_num((K * self.y[:, np.newaxis]).sum(axis=0) / K.sum(axis=0), False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return np.nan_to_num((K * self.y[:, np.newaxis]).sum(axis=0) / K.sum(axis=0), False)
 
     def find_opt_gamma(self):
         mse = np.empty_like(self.gamma, dtype=np.float)
@@ -67,43 +73,53 @@ class KernelRegression(BaseEstimator, RegressorMixin):
         return self.gamma[np.nanargmin(mse)]
 
 class MyForest():
-    def __init__(self, trees, depth, leaf_samples, max_features = None) -> None:
-        self.trees = trees
-        self.depth = depth
-        self.leaf_samples = leaf_samples
+    def __init__(self, n_estimators = 100, max_depth = None, min_samples_leaf = None, max_features = None) -> None:
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.min_samples_leaf = min_samples_leaf
         self.max_features = max_features
         self.val_set = None
         self.val_labels = None
-        self.params = None
+        if isinstance(n_estimators, Iterable) or isinstance(max_depth, Iterable) \
+            or isinstance(min_samples_leaf, Iterable) or isinstance(max_features, Iterable):
+            self.params = None
+        else:
+            self.params = {
+                'n_estimators': n_estimators, 
+                'max_depth': max_depth, 
+                'min_samples_leaf': min_samples_leaf, 
+                'max_features': max_features
+            }
 
     def set_val(self, val_set, val_labels):
         self.val_set = val_set
         self.val_labels = val_labels
 
-    def get_params(self):
-        return {'n_estimators': self.n_estims, 'max_depth': self.max_depth, 'min_samples_leaf': self.min_samples_leaf, 'max_features': self.max_features}
+    def get_params(self, deep):
+        return {'n_estimators': self.n_estimators, 'max_depth': self.max_depth, 'min_samples_leaf': self.min_samples_leaf, 'max_features': self.max_features}
 
-    def set_params(self, params):
-        self.params = params
+    def set_params(self, **params):
+        for key in params:
+            setattr(self, key, params[key])
 
     def __call__(self):
         return self
 
     def fit(self, x, y):
         if self.params is not None:
-            self.tree = RandomForestRegressor(**self.params)
+            self.tree = RandomForestRegressor(self.n_estimators, max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf, max_features=self.max_features)
             self.tree.fit(x, y)
             return self
         if self.val_set is not None and self.val_labels is not None:
             min_mse = 10 ** 9
-            for n_estimators, max_depth, min_samples_leaf in product(self.trees, self.depth, self.leaf_samples):
+            for n_estimators, max_depth, min_samples_leaf in product(self.n_estimators, self.max_depth, self.min_samples_leaf):
                 tree = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, min_samples_leaf=min_samples_leaf, max_features=self.max_features)
                 tree.fit(x, y)
                 cur_mse = calc_mse(tree.predict(self.val_set), self.val_labels)
                 if cur_mse < min_mse:
                     min_mse = cur_mse
                     self.tree = tree
-                    self.n_estims = n_estimators
+                    self.n_estimators = n_estimators
                     self.max_depth = max_depth
                     self.min_samples_leaf = min_samples_leaf
         else:

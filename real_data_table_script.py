@@ -2,42 +2,37 @@ import pickle
 from time import time
 import numpy as np
 import tensorflow as tf
+from sklearn.ensemble import RandomForestRegressor
 from treatment_frameworks import *
 from utility import *
 from other_models import *
-from funcs import get_log_setup, get_pow_setup, get_spiral_setup, get_indic_setup
+from funcs import get_ihdp_setup
 
 
 if __name__ == '__main__':
 
-    cur_setup = get_log_setup
+    cur_setup = get_ihdp_setup
+    val_part = 0.2
+    test_part = 0.4
+    n_splits = int(round((1 - test_part) / val_part, 0))
 
-    alpha = 1
+    alpha = 0.1
     batch_size = 256
-    learning_rate_a = 0.002
+    learning_rate_a = 0.005
     learning_rate = 0.01
-    epochs_num_alpha = 100
-    epochs_num_ordinary = 50
-    patience = 5
-    m = 20
-    tasks = 200000
+    epochs_num_alpha = 50
+    epochs_num_ordinary = 100
+    patience = 7
+    tasks_alpha = 100000
     iters = 5
-    n_splits = 3
 
-    control_size = 500
-    treat_part = 0.1
-    test_size = 1000
-    treat_size = int(treat_part * control_size)
-
-    mlp_coef = 200000 // control_size
-    n = 100 if control_size > 100 else 80
-    n_t = treat_size // 2
-    n_c = n_t
-    mlp_coef_val = 500
+    tasks_num = 200000
+    n = 50
+    mlp_coef_val = 300
 
     seed = int(time()) % 2048
 
-    ser_name = f'table.pk'
+    ser_name = 'ihdp table'
 
     nw_cv_grid = {
         'gamma': [10 ** i for i in range(-8, 11)] + [0.5, 5, 50, 100, 200, 500, 700],
@@ -77,13 +72,17 @@ if __name__ == '__main__':
         for i in range(iters):
             seed = np.random.randint(0, 2048)
             start_time = time()
-            setup = cur_setup(m)
-            setup.make_set(control_size, treat_part, test_size)
+            setup = cur_setup(seed)
+            setup.make_set(val_part, test_part)
             train_x, train_y, train_w = setup.get_train_set()
             control_x, control_y, treat_x, treat_y = setup.get_cotrol_treat_sets()
             test_x, test_control, test_treat,  test_cate = setup.get_test_set()
             val_set_c, val_labels_c, val_set_t, val_labels_t = setup.get_val_set()
 
+            m = train_x.shape[1]
+            control_size = np.count_nonzero(train_w == 0)
+            treat_size = np.count_nonzero(train_w == 1)
+            mlp_coef = tasks_num // control_size
             model = get_basic_dynamic_model(
                 setup, m, n, epochs_num_ordinary, mlp_coef, mlp_coef_val, learning_rate, seed, batch_size, patience)
 
@@ -93,10 +92,11 @@ if __name__ == '__main__':
                                                         test_x, treat_y, test_treat, treat_size, m, 1)
             cnt_pred = model.predict(test_data_control)
             results['Kernel control'].append(calc_mse(cnt_pred, cnt_label))
-
-            alpha_model = get_alpha_dynamic_model(
-                setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val, learning_rate, seed, batch_size, tasks, alpha, patience)
+            n_t = treat_size // 2
+            n_c = n_t
+            alpha_model = get_alpha_dynamic_model(setup, m, n_c, n_t, epochs_num_alpha, mlp_coef_val, learning_rate, seed, batch_size, tasks_alpha, alpha, patience)
             trt_pred_a = alpha_model.predict(test_data_treat)
+            trt_pred_a = model.predict(test_data_treat)
             results['Kernel treat'].append(calc_mse(trt_pred_a, trt_label))
             results['Kernel CATE'].append(calc_mse(trt_pred_a - cnt_pred, trt_label - cnt_label))
 
@@ -149,12 +149,12 @@ if __name__ == '__main__':
         'n_c': n_c,
         'n_t': n_t,
         'alpha': alpha,
-        'tasks': tasks,
+        'tasks': tasks_alpha,
         'iters': iters,
         'control_size': control_size,
-        'treat_part': treat_part,
+        'treat_part': 1 - test_part - val_part,
         'treat_size': treat_size,
-        'test_size': test_size,
+        'test_size': test_x.shape[0],
         'seed': seed,
         'learning_rate': learning_rate,
         'val_part_c': 0.2,
@@ -163,5 +163,5 @@ if __name__ == '__main__':
     }
 
     results['params'] = params
-    with open(f'res_dicts/{ser_name}', 'wb') as file:
+    with open(f'res_dicts/{ser_name}.pk', 'wb') as file:
         pickle.dump(results, file)

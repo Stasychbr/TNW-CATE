@@ -2,6 +2,7 @@ import numba
 import numpy as np
 from tensorflow.keras.utils import Sequence
 
+
 @numba.njit
 def alpha_tasks_gen(x, y, n, m, tasks_num):
     idx = np.arange(1, x.shape[0])
@@ -13,7 +14,7 @@ def alpha_tasks_gen(x, y, n, m, tasks_num):
     mlp_coef = tasks_num // x.shape[0]
     for i in range(x.shape[0] - 1):
         for j in range(mlp_coef):
-            x_p[i * mlp_coef  + j, ...] = x[i]
+            x_p[i * mlp_coef + j, ...] = x[i]
             labels[i * mlp_coef + j] = y[i]
         for j in range(mlp_coef):
             cur_idx = np.random.choice(idx, n, False)
@@ -30,6 +31,7 @@ def alpha_tasks_gen(x, y, n, m, tasks_num):
         x_in[cur_task + j, ...] = x[cur_idx]
         y_in[cur_task + j, :] = y[cur_idx]
     return x_in, y_in, x_p, labels
+
 
 class AlphaGenerator(Sequence):
     def __init__(self, cnt_x, cnt_y, trt_x, trt_y, n_c, n_t, m, tasks_num, batch_size):
@@ -53,12 +55,15 @@ class AlphaGenerator(Sequence):
         data_trt = [ar[idx * self.batch_size:(idx + 1) * self.batch_size] for ar in self.trt_data]
         labels_trt = self.trt_labels[idx * self.batch_size:(idx + 1) * self.batch_size]
         return data_cnt + data_trt, [labels_cnt, labels_trt]
-    
+
     def on_epoch_end(self):
-        *con_data, self.cnt_labels = alpha_tasks_gen(self.cnt_x, self.cnt_y, self.n_c, self.m, self.tasks_num)
-        *treat_data, self.trt_labels = alpha_tasks_gen(self.trt_x, self.trt_y, self.n_t, self.m, self.tasks_num)
+        *con_data, self.cnt_labels = alpha_tasks_gen(self.cnt_x,
+                                                     self.cnt_y, self.n_c, self.m, self.tasks_num)
+        *treat_data, self.trt_labels = alpha_tasks_gen(self.trt_x,
+                                                       self.trt_y, self.n_t, self.m, self.tasks_num)
         self.cnt_data = list(con_data)
         self.trt_data = list(treat_data)
+
 
 @numba.njit
 def make_train_set(x, y, n, m, mlp_coef):
@@ -68,9 +73,6 @@ def make_train_set(x, y, n, m, mlp_coef):
     x_p = np.zeros((x.shape[0], mlp_coef, m))
     labels = np.zeros((x.shape[0], mlp_coef))
     for i in range(x.shape[0]):
-        # x_r = np.reshape(x[i], (1, m))
-        # check_2 = np.repeat(x_r, mlp_coef, np.int64(0))
-        # x_p[i, ...] = np.repeat(x_r, mlp_coef, np.int64(0))
         for j in range(mlp_coef):
             x_p[i, j, :] = x[i]
         labels[i, :] = y[i]
@@ -85,6 +87,7 @@ def make_train_set(x, y, n, m, mlp_coef):
     x_p = np.reshape(x_p, (-1, m))
     labels = np.reshape(labels, (-1, 1))
     return x_in, y_in, x_p, labels
+
 
 class TrainGenerator(Sequence):
     def __init__(self, control_x, control_y, n, m, mlp_coef, batch_size) -> None:
@@ -101,7 +104,8 @@ class TrainGenerator(Sequence):
 
     def __getitem__(self, idx):
         return [ar[idx * self.batch_size:(idx + 1) * self.batch_size] for ar in self.data], self.labels[idx * self.batch_size:(idx + 1) * self.batch_size]
-                 
+
     def on_epoch_end(self):
-        x, y, x_p, self.labels = make_train_set(self.control_x, self.control_y, self.n, self.m, self.mlp_coef)
+        x, y, x_p, self.labels = make_train_set(
+            self.control_x, self.control_y, self.n, self.m, self.mlp_coef)
         self.data = [x, y, x_p]
